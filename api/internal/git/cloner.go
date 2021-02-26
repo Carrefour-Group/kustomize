@@ -5,8 +5,11 @@ package git
 
 import (
 	"bytes"
+	"fmt"
 	"log"
+	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/pkg/errors"
 	"sigs.k8s.io/kustomize/api/filesys"
@@ -15,10 +18,74 @@ import (
 // Cloner is a function that can clone a git repo.
 type Cloner func(repoSpec *RepoSpec) error
 
+func ClonerUsingGitExec(repoSpec *RepoSpec) error {
+	if repoSpec.Ref == "" {
+		repoSpec.Ref = "master"
+	}
+
+	gitProgram, err := exec.LookPath("git")
+	if err != nil {
+		return errors.Wrap(err, "no 'git' program on path")
+	}
+	gitRootDir, err := filesys.GitRootDir()
+
+	if err != nil {
+		return err
+	}
+
+	_ = os.Mkdir(gitRootDir.String(), 0755 | os.ModeDir)
+
+	repoFolderName := strings.ReplaceAll(fmt.Sprintf("%s_%s_%s", repoSpec.Host, repoSpec.OrgRepo, repoSpec.Ref), "/", "_")
+	repoSpec.Dir = filesys.ConfirmedDir(gitRootDir.Join(repoFolderName))
+
+	log.Printf("visited git repo: %s", repoFolderName)
+
+	if _, err := os.Stat(repoSpec.Dir.String()); os.IsNotExist(err) {
+		tmpDir, err := filesys.NewTmpConfirmedDir()
+		if err != nil {
+			return err
+		}
+
+		//first clone
+		//git clone -b branch --single-branch git@HOST:REPO.git
+		cmd := exec.Command(
+			gitProgram,
+			"clone",
+			"--depth",
+			"1",
+			"-b",
+			repoSpec.Ref,
+			"--single-branch",
+			repoSpec.CloneSpec(),
+			".")
+		var out bytes.Buffer
+		cmd.Stdout = &out
+		cmd.Stderr = &out
+		cmd.Dir = tmpDir.String()
+		err = cmd.Run()
+		if err != nil {
+			log.Printf("Error setting git remote: %s", out.String())
+			return errors.Wrapf(
+				err,
+				"trouble adding remote %s",
+				repoSpec.CloneSpec())
+		}
+		err = os.Rename(tmpDir.String(), repoSpec.Dir.String())
+		if err != nil {
+			os.RemoveAll(tmpDir.String())
+		}
+	} else {
+		//dir already exists
+		//TODO maybe pull updates
+	}
+
+	return nil
+}
+
 // ClonerUsingGitExec uses a local git install, as opposed
 // to say, some remote API, to obtain a local clone of
 // a remote repo.
-func ClonerUsingGitExec(repoSpec *RepoSpec) error {
+func ClonerUsingGitExecV1(repoSpec *RepoSpec) error {
 	gitProgram, err := exec.LookPath("git")
 	if err != nil {
 		return errors.Wrap(err, "no 'git' program on path")

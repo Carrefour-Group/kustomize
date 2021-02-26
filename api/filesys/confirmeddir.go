@@ -4,7 +4,9 @@
 package filesys
 
 import (
+	"fmt"
 	"io/ioutil"
+	"os/user"
 	"path/filepath"
 	"strings"
 )
@@ -29,6 +31,14 @@ func NewTmpConfirmedDir() (ConfirmedDir, error) {
 	// resolve the real absolute path.
 	deLinked, err := filepath.EvalSymlinks(n)
 	return ConfirmedDir(deLinked), err
+}
+
+func GitRootDir() (ConfirmedDir, error) {
+	usr, err := user.Current()
+	if err != nil {
+		return "", err
+	}
+	return ConfirmedDir(fmt.Sprintf("%s/.kustomize", usr.HomeDir)), nil
 }
 
 // HasPrefix returns true if the directory argument
