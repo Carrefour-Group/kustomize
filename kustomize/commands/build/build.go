@@ -24,6 +24,7 @@ var theFlags struct {
 		plugins        bool
 		managedByLabel bool
 		helm           bool
+		gitCache	   bool
 	}
 	helmCommand    string
 	loadRestrictor string
@@ -105,6 +106,7 @@ func NewCmdBuild(
 	AddFlagReorderOutput(cmd.Flags())
 	AddFlagEnableManagedbyLabel(cmd.Flags())
 	AddFlagEnableHelm(cmd.Flags())
+	AddFlagEnableGitCache(cmd.Flags())
 	return cmd
 }
 
@@ -140,5 +142,6 @@ func HonorKustomizeFlags(kOpts *krusty.Options) *krusty.Options {
 	}
 	kOpts.PluginConfig.HelmConfig.Command = theFlags.helmCommand
 	kOpts.AddManagedbyLabel = isManagedByLabelEnabled()
+	kOpts.EnableGitCache = theFlags.enable.gitCache
 	return kOpts
 }
